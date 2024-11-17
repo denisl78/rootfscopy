@@ -1,0 +1,87 @@
+#!/bin/bash
+DESTDIR="/rootfs"
+PKG_LIB="/var/lib/rpm"
+PKG_STATUS="rpm -q"
+
+error() {
+    echo "$*" 1>&2
+    exit 1
+}
+
+pkg_own() {
+    file=$1
+    set +e
+    rpm -qf "$file"
+    set -e
+}
+
+pkgstatus() {
+    file="$1"
+    pkg=$(pkg_own $file)
+
+    if [ -z "${pkg}" ]; then
+        echo "${file} doesn't belong to any package" 1>&2
+        return
+    fi
+
+    echo "${file} belongs to package ${pkg}"
+    [ -d ${DESTDIR}/${PKG_LIB} ] || mkdir -p ${DESTDIR}/${PKG_LIB}
+    grep "Package: ${pkg}" ${DESTDIR}/${PKG_LIB}/status || {
+        echo "Adding ${pkg} into rpm/status"
+        ${PKG_STATUS} "${pkg}" >> ${DESTDIR}/${PKG_LIB}/status;
+        echo >> ${DESTDIR}/${PKG_LIB}/status;
+    }
+}
+
+copy() {
+    f="$1"
+    fn=$(basename "$1")
+
+    if [[ "${fn}" =~ ^libc.so* ]] || [[ "${fn}" =~  ^ld-linux* ]]; then
+        echo "Skipping ${fn} which is not allowed to copy" 1>&2
+        return
+    fi
+
+    if [ -e "${DESTDIR}/$f" ] || [ -e "${DESTDIR}/lib/$fn" ] || [ -e "${DESTDIR}/bin/$fn" ]; then
+        echo "${DESTDIR}/$f already exists"
+        return
+    fi
+
+    [ -e "$f" ] || error "$f does not exist!"
+
+    targetdir=$(dirname "${DESTDIR}/${f}")
+    [ -d "${targetdir}" ] || mkdir -p "${targetdir}"
+
+    echo "Copying $f"
+    if [ -d "$f" ]; then
+        echo "copying directory $f"
+        cp -r "$f" "${targetdir}/${fn}"
+    elif [ "${f//\/lib\//}" != "$f" ] || [ "${f//\/lib64\//}" != "$f" ] && [[ ! "${f}" == /${PKG_LIB}/status ]]; then
+        # File is library
+        #pkgstatus "$f"
+        cp -aL "$f" "${targetdir}/${fn}"
+        pkgstatus "$f"
+    elif [ "${f//\/bin\//}" != "$f" ] || [ "${f//\/sbin\//}" != "$f" ] || [ "${f//\/libexec\//}" != "$f" ]; then
+       # File is executable binary
+        echo "File is binary"
+        if [ "${f#${DESTDIR}}" != "$f" ]; then
+            echo "$f is already part of ${DESTDIR}, skipping" 1>&2
+        else
+            #pkgstatus "$f"
+            cp -aL "$f" "${targetdir}/${fn}"
+        fi
+        ldd "$f" | grep -Eo '\/[/a-z0-9_.+\-]*' | while read -r lib; do
+            echo "Copying ${lib} as a dependency to ${1}"
+            copy "${lib}"
+        done
+    else
+        # Anything else
+        echo "copying regular file ${f}"
+        cp -aL "$f" "${DESTDIR}/${1}"
+    fi
+}
+
+while [ "$1" != "" ]; do
+    copy "$1"
+    shift
+done
