@@ -1,7 +1,6 @@
 # RootFSCopy
 
-* RootFSCopy is a script to copy the root of a filesystem from
-a secure build container to a secure application container. 
+* RootFSCopy is a script to copy binaries and dependent libraries from build stage to application container. 
 * Initial realese only for ubi docker images
 
 ## usage
