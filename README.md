@@ -1,11 +1,11 @@
 # RootFSCopy
 
-* RootFSCopy is a script to copy binaries and dependent libraries from build stage to application container. 
-* Initial realese only for ubi docker images
+## info
+`filefscopy` is a script to copy binaries files and dependent libraries from build stage to application container. 
 
 ## usage
 
-In a dockerfile, typical use would look like:
+In a dockerfile, typical use will look like:
 
 ```
 FROM some_builder_imager AS builder_container
@@ -15,8 +15,8 @@ FROM some_builder_imager AS builder_container
 # install a bunch of dependencies
 ...
 
-COPY rootfscopy /usr/local/bin/
-RUN rootfscopy \
+COPY filefscopy /usr/local/bin/
+RUN filefscopy \
         /some/dependency \
         /some/dependency \
         /some/service
